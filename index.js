@@ -116,7 +116,7 @@ app.post('/api/persons', (req, res) => {
   res.json(phoneBook)
 })
 
-const PORT = 3001
+const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
     console.log('The server is running at port 3001')
 })
