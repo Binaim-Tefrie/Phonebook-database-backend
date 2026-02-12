@@ -1,6 +1,7 @@
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
-
+const Phone = require('./models/phone')
 const app = express()
 
 app.use(express.static('dist'))
@@ -20,100 +21,124 @@ const display = (tokens, req, res) => {
 
 app.use(morgan(display))
 
-let phoneBook = [
-    { 
-      "id": "1",
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": "2",
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": "3",
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": "4",
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
-
-app.get('/', (req, res) => {
-    res.send('<h1>WelcomeTo Part 3</h1>')
-})
-//Info visitors and date
 app.get('/api/persons', (req, res) => {
-    res.json(phoneBook)
+  Phone.find({}).then(result => {
+    res.json(result)
+  })
 })
 
-let visitors = 0
-app.get('/info', (req, res) => {
+//Info visitors and date
+app.get('/info', (req, res, next) => {
   const now = new Date().toString()
-   visitors += 1
-   const info = `
-                  <div>
-                    <p>Phonebook has info for ${visitors} people</p>
+   
+  Phone.find({})
+  .then(result => {
+    console.log('info', result.length)
+    const info = `
+                    <p>Phonebook has info for ${result.length} people</p>
                     <P>${now}</p>
-                  </div> 
-                `
-  res.send(`<h1>${info}</h1>`)
-
+                 `
+      res.send(`<div>${info}</div>`) 
+  })
+  .catch(error => next(error))
 })
 
 //Fetch a resource
-app.get('/api/persons/:id', (req, res) => {
-    const id = req.params.id
-    const phone = phoneBook.find(phone => phone.id === id)
-    
-    if(phone){
+app.get('/api/persons/:id', (req, res, next) => {
+    Phone.findById(req.params.id)
+    .then(phone => {
+      if(phone){
         res.json(phone)
-    }
-    else {
+      }
+      else {
         res.status(404).end()
-    }
+      }
+    })
+    .catch(error => next(error))
 })
 
 //Delete a resource
-app.delete('/api/persons/:id', (req, res) => {
-    const id = req.params.id
-    phoneBook = phoneBook.filter(person => person.id !== id)
-    res.status(204).end()
+app.delete('/api/persons/:id', (req, res, next) => {
+    Phone.findByIdAndDelete(req.params.id)
+      .then(result => {
+        console.log('result', result)
+      res.status(204).end()
+      })
+      .catch(error => next(error))
 })
 
-//Generate an id
-const generate_id = () => {
-  return Math.floor(Math.random() * 1_000_000).toString()
-}
-const check_id = () => {
-  const ids = phoneBook.map(p => p.id)
-  const id = generate_id()
-
-  return ids.includes(id) ? check_id() : id
-}
-
 //Send a data to the server
-app.post('/api/persons', (req, res) => {
-  const id = check_id()
+app.post('/api/persons', (req, res, next) => {
+
   const body = req.body
 
   if(!body.name || !body.number){
-    res.status(404).json({ 
-      error: 'name must be unique' 
-    })
+    res.status(400).json({ error: 'name must be unique'})
   }
-  const newPhone = {
-    'id': id,
-    'name': body.name, 
-    'number': body.number
-  }
-  phoneBook = phoneBook.concat(newPhone)
-  res.json(phoneBook)
+  
+  const newPhone = new Phone({
+      'name': body.name,
+      'number': body.number
+  })
+  
+  newPhone.save()
+  .then(savedPhone => {
+    res.json(savedPhone)
+  })
+  .catch(error => next(error))
 })
+
+//Update a resource
+app.put('/api/persons/:id', (req, res, next) => {
+  Phone.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true
+  })
+  .then(updatePhone => {
+    if(updatePhone){
+      res.json(updatePhone)
+    }
+    else {
+      res.status(404).json({ error: 'Person not found' });
+    }
+  })
+  .catch(error => next(error))
+})
+
+// Endpoint errors
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+// handler of requests with unknown endpoint
+app.use(unknownEndpoint)
+
+// Error handling middleware
+const errorHandler = (error, request, response, next) => {
+  
+  if (error.name === 'CastError') {
+    return response.status(400).json({ error: 'malformatted id' });
+  }
+
+  if (error.name === 'ValidationError') {
+    const errors = {};
+
+    for (const field in error.errors) {
+      const err = error.errors[field];
+
+      errors[field] = {
+        message: err.message,
+        type: err.kind === 'user defined' ? 'invalidFormat' : err.kind
+      };
+    }
+
+    return response.status(400).json({ errors });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
