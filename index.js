@@ -9,8 +9,8 @@ app.use(express.json())
 app.use(morgan('tiny'))
 
 const display = (tokens, req, res) => {
-  
-   return [
+
+  return [
     tokens.method(req, res),
     tokens.url(req, res),
     tokens.status(req, res),
@@ -30,22 +30,22 @@ app.get('/api/persons', (req, res) => {
 //Info visitors and date
 app.get('/info', (req, res, next) => {
   const now = new Date().toString()
-   
+
   Phone.find({})
-  .then(result => {
-    console.log('info', result.length)
-    const info = `
+    .then(result => {
+      console.log('info', result.length)
+      const info = `
                     <p>Phonebook has info for ${result.length} people</p>
                     <P>${now}</p>
                  `
-      res.send(`<div>${info}</div>`) 
-  })
-  .catch(error => next(error))
+      res.send(`<div>${info}</div>`)
+    })
+    .catch(error => next(error))
 })
 
 //Fetch a resource
 app.get('/api/persons/:id', (req, res, next) => {
-    Phone.findById(req.params.id)
+  Phone.findById(req.params.id)
     .then(phone => {
       if(phone){
         res.json(phone)
@@ -59,12 +59,12 @@ app.get('/api/persons/:id', (req, res, next) => {
 
 //Delete a resource
 app.delete('/api/persons/:id', (req, res, next) => {
-    Phone.findByIdAndDelete(req.params.id)
-      .then(result => {
-        console.log('result', result)
+  Phone.findByIdAndDelete(req.params.id)
+    .then(result => {
+      console.log('result', result)
       res.status(204).end()
-      })
-      .catch(error => next(error))
+    })
+    .catch(error => next(error))
 })
 
 //Send a data to the server
@@ -73,19 +73,19 @@ app.post('/api/persons', (req, res, next) => {
   const body = req.body
 
   if(!body.name || !body.number){
-    res.status(400).json({ error: 'name must be unique'})
+    res.status(400).json({ error: 'name must be unique' })
   }
-  
+
   const newPhone = new Phone({
-      'name': body.name,
-      'number': body.number
+    'name': body.name,
+    'number': body.number
   })
-  
+
   newPhone.save()
-  .then(savedPhone => {
-    res.json(savedPhone)
-  })
-  .catch(error => next(error))
+    .then(savedPhone => {
+      res.json(savedPhone)
+    })
+    .catch(error => next(error))
 })
 
 //Update a resource
@@ -94,15 +94,15 @@ app.put('/api/persons/:id', (req, res, next) => {
     new: true,
     runValidators: true
   })
-  .then(updatePhone => {
-    if(updatePhone){
-      res.json(updatePhone)
-    }
-    else {
-      res.status(404).json({ error: 'Person not found' });
-    }
-  })
-  .catch(error => next(error))
+    .then(updatePhone => {
+      if(updatePhone){
+        res.json(updatePhone)
+      }
+      else {
+        res.status(404).json({ error: 'Person not found' })
+      }
+    })
+    .catch(error => next(error))
 })
 
 // Endpoint errors
@@ -115,33 +115,33 @@ app.use(unknownEndpoint)
 
 // Error handling middleware
 const errorHandler = (error, request, response, next) => {
-  
+
   if (error.name === 'CastError') {
-    return response.status(400).json({ error: 'malformatted id' });
+    return response.status(400).json({ error: 'malformatted id' })
   }
 
   if (error.name === 'ValidationError') {
-    const errors = {};
+    const errors = {}
 
     for (const field in error.errors) {
-      const err = error.errors[field];
+      const err = error.errors[field]
 
       errors[field] = {
         message: err.message,
         type: err.kind === 'user defined' ? 'invalidFormat' : err.kind
-      };
+      }
     }
 
-    return response.status(400).json({ errors });
+    return response.status(400).json({ errors })
   }
 
-  next(error);
-};
+  next(error)
+}
 
 app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
-    console.log('The server is running at port 3001')
+  console.log('The server is running at port 3001')
 })
 
